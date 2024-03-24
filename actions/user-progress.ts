@@ -17,9 +17,9 @@ export const upsertUserProgress = async (courseId: number) => {
 
   const course = await getCourseById(courseId);
 
-  if (!course) {
-    throw new Error("Course not found");
-  }
+  // if (!course) {
+  //   throw new Error("Course not found");
+  // }
   // if (!course.units.length || !course.units[0].lessons.length) {
   //   throw new Error("Course is empty");
   // }
