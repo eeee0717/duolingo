@@ -40,7 +40,7 @@ export const unitsRelations = relations(
 			fields: [units.courseId],
 			references: [courses.id],
 		}),
-		lesson: many(lessons),
+		lessons: many(lessons),
 	})
 );
 
