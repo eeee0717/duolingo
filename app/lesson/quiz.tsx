@@ -1,11 +1,13 @@
 'use client';
 
 import { challengeOptions, challenges } from '@/db/schema';
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { Header } from './header';
 import { QuestionBubble } from './question-bubble';
 import { Challenge } from './challenge';
 import { Footer } from './footer';
+import { upsertChallengeProgress } from '@/actions/challenge-progress';
+import { toast } from 'sonner';
 
 type Props = {
 	initialPercentage: number;
@@ -28,6 +30,8 @@ export const Quiz = ({
 	initialLessonChallenges,
 	userSubscription,
 }: Props) => {
+	const [pending, startTransition] = useTransition();
+
 	const [hearts, setHearts] = useState(initialHearts);
 	const [percentage, setPercentage] = useState(initialPercentage);
 	const [challenges] = useState(initialLessonChallenges);
@@ -39,16 +43,61 @@ export const Quiz = ({
 	});
 
 	const [selectedOption, setSelectedOption] = useState<number>();
-	const [status, setStatus] = useState<'correct' | 'wrong' | 'none'>('none');
+	const [status, setStatus] = useState<'correct' | 'wrong' | 'none'>(
+		'none'
+	);
 	const challenge = challenges[activeIndex];
 	const options = challenge?.challengeOptions ?? [];
 
-	const onSelect = (id: number) =>{
-		if(status != 'none') return;
+	const onNext = () => {
+		setActiveIndex((cur) => cur + 1);
+	};
 
+	const onSelect = (id: number) => {
+		if (status != 'none') return;
 		setSelectedOption(id);
+	};
 
+	const onContinue = () => {
+		if (!selectedOption) return;
 
+		if (status === 'wrong') {
+			setStatus('none');
+			setSelectedOption(undefined);
+			return;
+		}
+		if (status === 'correct') {
+			setStatus('none');
+			setSelectedOption(undefined);
+			onNext();
+			return;
+		}
+
+		const correctOption = options.find((option) => option.correct);
+		if (!correctOption) return;
+		if ( correctOption.id === selectedOption) {
+			startTransition(() => {
+				upsertChallengeProgress(challenge.id)
+					.then((response) => {
+						if (response?.error === 'hearts') {
+							console.log('hearts');
+							return;
+						}
+						console.log('correct');
+						setStatus('correct');
+						setPercentage((cur) => cur + 100 / challenges.length);
+
+						if (initialPercentage === 100) {
+							setHearts((cur) => Math.min(cur + 1, 5));
+						}
+					})
+					.catch(() => toast.error('Something went wrong'));
+			});
+		} else {
+			// setStatus('wrong');
+			// setHearts((cur) => cur - 1);
+			console.log('wrong');
+		}
 	};
 	const title =
 		challenge.type === 'ASSIST'
@@ -70,10 +119,11 @@ export const Quiz = ({
 						</h1>
 						<div>
 							{challenge.type === 'ASSIST' && (
-								<QuestionBubble question={challenge.question}/>
+								<QuestionBubble question={challenge.question} />
 							)}
-							<Challenge options = {options}
-								onSelect = {onSelect}
+							<Challenge
+								options={options}
+								onSelect={onSelect}
 								status={status}
 								selectedOption={selectedOption}
 								disabled={false}
@@ -86,7 +136,7 @@ export const Quiz = ({
 			<Footer
 				disabled={!selectedOption}
 				status={status}
-				onCheck={() => {}}
+				onCheck={onContinue}
 			/>
 		</>
 	);
